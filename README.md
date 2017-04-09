@@ -8,6 +8,11 @@
 
 一个函数库，从它的设计到实现，每一个功能函数，都集中了千百人的智慧，看一下又何妨呢？
 
+## 目录
+
+- Directory
+  + [x] [总体架构](https://github.com/songjinzhong/UnderscoreSource/tree/master/01-main)- 只有弄懂整体架构，后面的学习才好办
+
 下面的文章或系列文章，在我看源码的过程中，对我帮助很大，感谢！
 
 >[underscorejs 官网](http://underscorejs.org/)

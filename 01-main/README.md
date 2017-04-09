@@ -102,18 +102,19 @@ _([1,2,3]).each(console.log)
 
 ```javascript
 _.mixin = function(obj) {
-  _.each(_.functions(obj), function(name) {
-    var func = _[name] = obj[name];
-    _.prototype[name] = function() {
+  _.each(_.functions(obj), function(name) { // 调用 each 对每一个函数对象处理
+    var func = _[name] = obj[name]; // 绑定到 _ 上
+    _.prototype[name] = function() { // 绑定到 _ 的原型上
       var args = [this._wrapped];
-      push.apply(args, arguments);
-      return result(this, func.apply(_, args));
+      push.apply(args, arguments); // 参数对齐
+      return result(this, func.apply(_, args)); // 调用 result 查看是否链式
     };
   });
 };
 
 _.mixin(_); // 执行
 
+// 相关的一些方法
 _.functions = _.methods = function(obj) {
   var names = [];
   for (var key in obj) {
@@ -121,6 +122,9 @@ _.functions = _.methods = function(obj) {
   }
   return names.sort();
 };
+_.isFunction = function(obj){
+  return typeof obj == 'function' || false;
+}
 ```
 
 `_.functions` 是一个获取目标所有函数对象的方法，并把这些方法浅拷贝传递给 `_` 和 `_`的原型，因为原型方法，处理对象已经在 `_wrapped` 中了，而这些常用的方法参数都是固定的，如果直接调用，参数会出问题，所以：
@@ -140,7 +144,7 @@ func.apply(_, args);
 ```javascript
 _.chain = function(obj) {
   var instance = _(obj);
-  instance._chain = true;
+  instance._chain = true; // 设置一个 _chain 属性，后面用于判断链式
   return instance;
 };
 ```
@@ -167,7 +171,7 @@ _(arr)
   .map(function(v){ return v + 1 }) // [23, 34, 45]
 ```
 
-现在返回来看一下 `_` 函数：
+现在返回来看一下 `_` 函数，也非常的有意思，`_(obj)`实际上是执行两次的，第二次才用到了 new：
 
 ```javascript
 var _ = function(obj) {
@@ -177,4 +181,56 @@ var _ = function(obj) {
 };
 ```
 
-现在应该就非常的明朗了吧。
+现在应该就非常的明朗了吧。当调用 `_([22,33,44])` 的时候，发现 obj 并不是继承与 `_`，会用 new 来生成，又会重新跑一遍 `_` 函数，然后将 `_wrapped` 属性指向 obj。
+
+由于在之前已经 `root = this`，Underscore 在不同的环境中都可以运行，需要将 `_` 放到不同的环境中：
+
+```javascript
+if (typeof exports !== 'undefined') { // nodejs 模块
+  if (typeof module !== 'undefined' && module.exports) {
+    exports = module.exports = _;
+  }
+  exports._ = _;
+} else { // window
+  root._ = _;
+}
+```
+
+## 接着看源码
+
+源码再往下看，是一个 optimizeCb 函数，用来优化回调函数：
+
+```javascript
+var optimizeCb = function(func, context, argCount) {
+  // 这里没有用 undefined，而是用 void 0
+  if (context === void 0) return func; // 只有一个参数，直接返回回调函数
+  switch (argCount == null ? 3 : argCount) { // call 比 apply 好？
+    case 1: return function(value) {
+      return func.call(context, value);
+    };
+    case 2: return function(value, other) {
+      return func.call(context, value, other);
+    };
+    case 3: return function(value, index, collection) {
+      return func.call(context, value, index, collection);
+    };
+    case 4: return function(accumulator, value, index, collection) {
+      return func.call(context, accumulator, value, index, collection);
+    };
+  }
+  // 最后走 apply 函数
+  return function() {
+    return func.apply(context, arguments);
+  };
+};
+```
+
+所谓优化版的回调函数，就是用 call 来固定参数，1 个参数，2 个参数，3 个参数，4 个参数的时候，由于 apply 可以不用考虑参数，但是在性能上面貌似没有 call 好。
+
+## 参考
+
+>[Underscore.js (1.8.3) 中文文档](http://www.css88.com/doc/underscore/)
+
+>[Underscore源码解析（一）](https://segmentfault.com/a/1190000000515420)
+
+>[中文版 underscore 代码注释](https://github.com/hanzichi/underscore-analysis/blob/master/underscore-1.8.3.js/underscore-1.8.3-analysis.js)
