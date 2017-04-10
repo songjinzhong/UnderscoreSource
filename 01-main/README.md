@@ -227,6 +227,68 @@ var optimizeCb = function(func, context, argCount) {
 
 所谓优化版的回调函数，就是用 call 来固定参数，1 个参数，2 个参数，3 个参数，4 个参数的时候，由于 apply 可以不用考虑参数，但是在性能上面貌似没有 call 好。
 
+然后后面还有一个 cb 函数，也是用来作为回调函数的。
+
+```javascript
+var cb = function(value, context, argCount) {
+  if (value == null) return _.identity;
+  if (_.isFunction(value)) return optimizeCb(value, context, argCount);
+  if (_.isObject(value)) return _.matcher(value);
+  return _.property(value);
+};
+_.iteratee = function(value, context) {
+  return cb(value, context, Infinity);
+};
+```
+
+iteratee 可以用来对函数进行处理，给一个函数绑定 this 等等，最总还是调用到 cb，其实 cb 本身就很复杂，要么是一个 identity 函数，要么是一个优化到回调函数，要么是一个 property 获取属性函数。
+
+再往下就是 `createAssigner`，搜了一下，发现全文有三处用到此函数，分别是 extend、extendOwn、default，可以看出来，此函数主要到作用是用来实现拷贝，算是拷贝到辅助函数吧，把拷贝公共到部分抽离出来：
+
+```javascript
+var createAssigner = function(keysFunc, undefinedOnly) {
+  return function(obj) {
+    var length = arguments.length;
+    if (length < 2 || obj == null) return obj;
+
+    // 将第二个参数及以后的 object 拷贝到第一个 obj 上
+    for (var index = 1; index < length; index++) {
+      var source = arguments[index],
+          // keysFunc 是点睛所在
+          // 不同的 keysFunc 获得的 keys 集合不同
+          // 分为两种，所有 keys（包括继承），自身 keys
+          keys = keysFunc(source),
+          l = keys.length;
+      for (var i = 0; i < l; i++) {
+        var key = keys[i];
+        // underfinedOnly 表示是否覆盖原有
+        if (!undefinedOnly || obj[key] === void 0) obj[key] = source[key];
+      }
+    }
+    return obj;
+  };
+};
+```
+
+所以当 keyFunc 函数获得所有 keys 时，包括继承来的，这个时候就对应于 `_.extend` 函数，非继承 keys 时，对应于 `_.extendOwn`。如果 underfinedOnly 设置为 true，则实现的是不替换原有属性的继承 `_.defaults`。
+
+在 Underscore 中，原型的继承用 baseCreate 函数：
+
+```javascript
+var Ctor = function(){};
+
+var baseCreate = function(prototype) {
+  if (!_.isObject(prototype)) return {};
+  if (nativeCreate) return nativeCreate(prototype);
+  Ctor.prototype = prototype;
+  var result = new Ctor;
+  Ctor.prototype = null;
+  return result;
+};
+```
+
+`nativeCreate` 之前已经介绍来，就是 `Object.create`，所以，如果浏览器不支持，下面实现的功能就是在实现这个函数，方法也很常规，用了一个空函数 Ctor 主要是防止 new 带来的多余属性问题。
+
 ## 参考
 
 >[Underscore.js (1.8.3) 中文文档](http://www.css88.com/doc/underscore/)
