@@ -289,6 +289,25 @@ var baseCreate = function(prototype) {
 
 `nativeCreate` 之前已经介绍来，就是 `Object.create`，所以，如果浏览器不支持，下面实现的功能就是在实现这个函数，方法也很常规，用了一个空函数 Ctor 主要是防止 new 带来的多余属性问题。
 
+`property` 函数也是一个比较有意思的函数，使用了闭包的思路，比如判断一个对象是否为类似数组结构的时候就用到了这个函数：
+
+```javascript
+var property = function(key) {
+  return function(obj) {
+    return obj == null ? void 0 : obj[key];
+  };
+};
+
+var MAX_ARRAY_INDEX = Math.pow(2, 53) - 1;
+var getLength = property('length'); // 返回一个闭包韩式，用来检测对象是非有 length 参数
+var isArrayLike = function(collection) {
+  var length = getLength(collection);
+  return typeof length == 'number' && length >= 0 && length <= MAX_ARRAY_INDEX;
+};
+```
+
+而且我搜索了一下，发现 getLength 函数使用的地方还是挺多的。
+
 ## 参考
 
 >[Underscore.js (1.8.3) 中文文档](http://www.css88.com/doc/underscore/)
