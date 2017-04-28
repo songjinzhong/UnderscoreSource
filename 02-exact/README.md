@@ -187,6 +187,32 @@ _.isUndefined = function(obj) {
 };
 ```
 
+不过对于 `isNaN` 函数，还是有 bug 的，比如：
+
+```javascript
+_.isNaN(new Number(1)); // true
+// new Number(1) 和 Number(1) 是有区别的
+```
+
+这边 github issue 上已经有人提出了这个问题，[_.isNaN](https://github.com/jashkenas/underscore/issues/2257)，也合并到分支了 [Fixes _.isNaN for wrapped numbers](https://github.com/jashkenas/underscore/pull/2259)，但是不知道为什么我这个 1.8.3 版本还是老样子，难度我下载了一个假的 underscore？issue 中提供了解决办法：
+
+```javascript
+_.isNaN = function(obj) {
+  // 将 !== 换成 !=
+  return _.isNumber(obj) && obj != +obj;
+};
+```
+
+我跑去最新发布的 underscore 下面看了下，最近更新 `4 month ago`，搜索了一下 `_.isNaN`：
+
+```javascript
+_.isNaN = function(obj) {
+  // 真的很机智，NaN 是 Number 且 isNaN(NaN) == true
+  // new Number(1) 这次返回的是 false 了
+  return _.isNumber(obj) && isNaN(obj);
+};
+```
+
 来看一眼 jQuery 里面的类型判断：
 
 ```javascript
@@ -404,6 +430,8 @@ _.uniq = _.unique = function(array, isSorted, iteratee, context) {
 
 还是要从 `unique` 的几个参数说起，第一个参数是数组，第二个表示是否已经排好序，第三个参数是一个函数，表示对数组的元素进行怎样的处理，第四个参数是第三个参数的上下文。返回值是一个新数组，思路也很清楚，对于已经排好序的数组，用后一个和前一个相比，不一样就 push 到 result 中，对于没有排好序的数组，要用到 `_.contains` 函数对 result 是否包含元素进行判断。
 
+去重的话，如果数组是排好序的，效率会很高，时间复杂度为 n，只要遍历一次循环即刻，对于未排好序的数组，要频繁的使用 `contains` 函数，复杂度很高，平均为 n 的平方。去重所用到为相等为严格等于 `===`，使用的时候要小心。
+
 `_.contains` 函数如下所示：
 
 ```javascript
@@ -435,12 +463,17 @@ function createIndexFinder(dir, predicateFind, sortedIndex) {
       return idx >= 0 ? idx + i : -1;
     }
     for (idx = dir > 0 ? i : length - 1; idx >= 0 && idx < length; idx += dir) {
+      // 这里使用的是严格等于
       if (array[idx] === item) return idx; // 找到，返回索引
     }
     return -1; // 没找到，返回 -1
   };
 }
 ```
+
+## 总结
+
+感觉 `Underscore` 的源码看起来还是很简单的，Underscore 里面有一些过时的函数，这些都可以拿过来学习，逻辑比较清晰，并不像 jQuery 那样，一个函数里面好多内部函数，看着看着就晕了。
 
 ## 参考
 
