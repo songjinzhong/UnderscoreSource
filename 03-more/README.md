@@ -150,6 +150,88 @@ _.countBy = group(function(result, value, key) {
 
 关于统计，这三个函数用的还真的不是很多，循环很好构造，处理函数也很好构造，如果数据是数组，直接 `forEach` 循环一遍添加一个处理函数就 ok 了，不过 `_` 最大的优点就是省事吧，这种重复利用函数、函数闭包的思路，是值的借鉴的。
 
+## bind 函数
+
+call、apply、bind 这三个函数也算是 js 函数中三剑客，经常能看到面试题，让实现 bind 函数，我就有一个疑问，难道支持 apply 的浏览器，不支持 bind 函数：
+
+实现 bind 函数：
+
+```javascript
+Function.prototype.bind = Function.prototype.bind || 
+  function(context){
+    var slice = Array.prototype.slice
+    var args = slice.call(arguments, 1),
+      self = this;
+    return function(){
+      self.apply(context, args.concat(slice.call(arguments)));
+    }
+  }
+```
+
+有时候也会看到有人这样写：
+
+```javascript
+Function.prototype.bind = Function.prototype.bind || 
+  function(context){
+    var self = this;
+    return function(){
+      self.apply(context, arguments);
+    }
+  }
+```
+
+下面这种写法显然是低级新手玩家的手准，因为对于 bind 函数，有个很大的优点就是提前预定参数，如果懂了这个，就不会犯这个错误。
+
+来看看 `_` 里高级玩家的写法：
+
+```javascript
+_.bind = function(func, context) {
+  // 原生 bind 还是好，此函数总结
+  if (nativeBind && func.bind === nativeBind) return nativeBind.apply(func, slice.call(arguments, 1));
+  // 报个错
+  if (!_.isFunction(func)) throw new TypeError('Bind must be called on a function');
+  var args = slice.call(arguments, 2); // 先存变量
+  var bound = function() {
+    return executeBound(func, bound, context, this, args.concat(slice.call(arguments)));
+  };
+  return bound;
+};
+
+var executeBound = function(sourceFunc, boundFunc, context, callingContext, args) {
+  // 还是用 apply 来回调，args 已经是拼接好的
+  if (!(callingContext instanceof boundFunc)) return sourceFunc.apply(context, args);
+  // 后面好想是针对 constructor 的，表示看不懂
+  var self = baseCreate(sourceFunc.prototype);
+  var result = sourceFunc.apply(self, args);
+  if (_.isObject(result)) return result;
+  return self;
+};
+```
+
+在 `_` 里类似 bind 的函数还有 `_.partial` 和 `_.bindAll`，只是使用的时候大同小异，就不多做介绍了，总之记住一句话，闭包无敌。
+
+## 总结
+
+又是三个知识点，分别是随机洗牌、分组和 bind 函数的实现，没什么复杂的。
+
+说到闭包，其实面试的时候问得最多的就是这个问题了，有啥优点，有啥缺点，如果是现场面，我直接手写一串代码，对面试官说：看，这就是闭吧：
+
+```javascript
+function add(m){
+  var fn = function(n){
+    return add( m + n );
+  }
+  fn.toString = function(){
+    return m;
+  }
+  return fn;
+}
+
+add(2)(3)(4).toString(); //9
+```
+
+好像不对，这不是闭包，是柯里化。
+
 ## 参考
 
 >[Fisher–Yates shuffle](https://en.wikipedia.org/wiki/Fisher%E2%80%93Yates_shuffle)
