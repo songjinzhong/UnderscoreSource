@@ -25,6 +25,89 @@ window.onscroll = function(){
 
 较早的时候，我用的是去抖实现来优化 scroll 事件，后来发现当鼠标滚动非常快的时候，是看不到这个渐变的过程，而是一个突变的过程。后来改成节流之后，效果明显变好了。
 
+## 去抖函数的实现
+
+去抖函数的应用场景如下：
+
+1. 用于 resize、scroll 函数，只计算最后一次的触发；
+2. 输入框发送 ajax 请求或者两个 input 框之间的映射；
+
+去抖函数的实现可以参考如下的代码：
+
+```javascript
+function debounce(fn, delay){
+  var timer = null,
+    self = this;
+  return function(){
+    var args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function(){
+      fn.apply(self, args);
+    }, delay)
+  }
+}
+```
+
+这是一个非常机智的做法，此方法在其他地方也很常见。用闭包保留当前的上下文，定义一个全局的 timer，每一次函数执行的时候，并不是直接执行，先清除上一次 Timeout，然后延迟 delay 执行。这样做的好处，很多高频函数就可以减少触发。
+
+保留了上下文，这样就可以指定 fn 的上下文：
+
+```javascript
+var obj = { id: 0 };
+var print = function(){
+  console.log(this.id ++);
+}
+// 绑定上下文，延迟 200ms 执行
+window.onresize = debounce.call(obj, print, 200);
+```
+
+如果 `onresize` 的速度很快，只有在最后一次，打印一次 id，这就是去抖。
+
+## 节流函数的实现
+
+节流函数的应用场景要更多一些：
+
+1. canvas 的 touchmove
+2. 鼠标的 mousemove
+3. 连续的 keyup、keydown、mouseup、mousedown 事件
+4. scroll 事件，需要经常处理，比如图片的滚动加载
+
+首先，节流是一个去抖函数，只不过加入了一个频率时间：
+
+```javascript
+function throttle(fn, delay, mustRun){
+  var timer, startTime = new Date(), self = this;
+  return function(){
+    var curTime = new Date(), args = arguments;
+    clearTimeout(timer);
+    if(curTime - startTime >= mustRun){
+      startTime = curTime;
+      fn.apply(self, args);
+    }else{
+      timer = setTimeout(function(){
+        fn.apply(self, args);
+      }, delay)
+    }
+  }
+}
+```
+
+`throttle` 有三个参数，第一个参数和第二个参数分别是回调函数和延迟时间，第三个参数代表如果函数在 mustRun 之后还没有执行，则必须执行一次。通过逻辑可以发现，如果将 mustRun 设置成非常大的值，比如十分钟，`throttle` 和 `debounce` 效果一样。
+
+```javascript
+var obj = { id: 0 };
+var print = function(){
+  console.log(this.id ++);
+}
+window.onscroll = throttle.call(obj, print, 200, 50);
+```
+
+函数执行的频率被限制了，函数执行的最短时间为 50ms（理想情况下），频率的最大值为每秒 20次，这就是节流函数。
+
+## `_` 中的节流和去抖
+
+在 `_` 中，
+
 ## 参考
 
 >[关于js函数节流和去抖动](http://www.jianshu.com/p/4f3e2c8f5e95)
