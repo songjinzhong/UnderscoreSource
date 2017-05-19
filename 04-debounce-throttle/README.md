@@ -29,7 +29,7 @@ window.onscroll = function(){
 
 去抖函数的应用场景如下：
 
-1. 用于 resize、scroll 函数，只计算最后一次的触发；
+1. 用于 resize、scroll 函数，只计算最后一次的触发，比如当窗口大小变化时，重新计算布局；
 2. 输入框发送 ajax 请求或者两个 input 框之间的映射；
 
 去抖函数的实现可以参考如下的代码：
@@ -106,7 +106,47 @@ window.onscroll = throttle.call(obj, print, 200, 50);
 
 ## `_` 中的节流和去抖
 
-在 `_` 中，
+在 `_` 中，有专门针对于节流和去抖的函数，分别是 `_.debounce` 和 `_.throttle`，不介绍了，直接进入源码吧。
+
+### 去抖函数源码
+
+去抖的实现，采用的方式和我之前介绍的完全不一样，但思路都是延迟和闭包，去抖函数还有一个隐藏属性，如果开启第三个参数，则会使得去抖函数变成立即执行一次函数，函数触发后会立即执行一次，且只会执行一次，除非本轮循环结束。立即执行函数也非常有用，比如鼠标 click 事件，需要立即执行，且要防止用户短时间内点击两次。
+
+```javascript
+_.debounce = function(func, wait, immediate) {
+  var timeout, args, context, timestamp, result;
+
+  // later 函数是延迟后执行的函数
+  var later = function() {
+    var last = _.now() - timestamp; // 获取延迟时间
+
+    if (last < wait && last >= 0) {
+      timeout = setTimeout(later, wait - last); // 继续延迟
+    } else {
+      timeout = null; //执行，设置 null 开启下次循环
+      if (!immediate) {
+        result = func.apply(context, args);
+        if (!timeout) context = args = null;
+      }
+    }
+  };
+
+  return function() {
+    context = this; // 上下文和参数
+    args = arguments;
+    timestamp = _.now(); // 记录当前的时间点
+    var callNow = immediate && !timeout; // 判断是否开启立即函数
+    if (!timeout) timeout = setTimeout(later, wait); // timeout 开始计时
+    // 立即执行
+    if (callNow) {
+      result = func.apply(context, args);
+      context = args = null;
+    }
+
+    return result;
+  };
+};
+```
 
 ## 参考
 
