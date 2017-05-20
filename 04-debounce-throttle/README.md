@@ -148,6 +148,63 @@ _.debounce = function(func, wait, immediate) {
 };
 ```
 
+去抖函数一个函数两个用途。
+
+### 节流函数源码
+
+节流函数源码如下，也同样支持三个参数，第三个参数表示配置信息，基本使用如下：函数在第一次触发时，由于执行间隔时间大于 wati，第一次函数一定会执行，如果你想在函数第一次执行的那一个时刻开始计时，禁止函数首次执行，传入 `{ leading: false }` 即可。函数在最后一次调用之后，会延迟时间，进行最后一次执行，如果你不希望看到最后一次执行，传入 `{ trailing: false }` 参数。
+
+```javascript
+_.throttle = function(func, wait, options) {
+  var context, args, result;
+  var timeout = null;
+  var previous = 0;
+  if (!options) options = {}; // 防止 option 为空
+  // 延迟执行函数
+  var later = function() {
+    // 判断是非需要首次执行
+    previous = options.leading === false ? 0 : _.now();
+    timeout = null;
+    result = func.apply(context, args);
+    if (!timeout) context = args = null;
+  };
+  return function() {
+    var now = _.now(); // 记录当前时间点
+    // 判断首次是否需要执行，如果不需要，将 previous 设置为当前时间
+    // 这个地方存在一个 bug：https://github.com/jashkenas/underscore/issues/2589
+    if (!previous && options.leading === false) previous = now;
+    var remaining = wait - (now - previous);
+    context = this;
+    args = arguments;
+    // 执行
+    if (remaining <= 0 || remaining > wait) {
+      if (timeout) {
+        clearTimeout(timeout);
+        timeout = null;
+      }
+      previous = now;
+      result = func.apply(context, args);
+      if (!timeout) context = args = null;
+    }
+    // 是否禁用最后一次执行 
+    else if (!timeout && options.trailing !== false) {
+      timeout = setTimeout(later, remaining);
+    }
+    return result;
+  };
+};
+```
+
+无论是 throttle 还是 debounce，都可以看出使用 `wait - last`，来计算剩余的执行时间，这对于固定频率来说，是一件很好的事情，而且使用 `!timeout` 来对定时进行判断，可以免去很多 `setTimeout`， 反观我之前写的代码，真的是垃圾。
+
+`options` 参数如果同时设置 leading 和 trailing，就会出现一个小 bug，[#2589](https://github.com/jashkenas/underscore/issues/2589)，因为最后一次函数得不到执行，导致 `previous` 不会为 0，除了第一轮以外的所有其他轮在执行时，`leading` 参数是失效的。当然，官方给的解释是：不要将两个参数同时设置，但是如果仔细想想，这种需求也是存在的：从第一次点击时开始计时，使得函数的频率固定在 wait 时间内。如果中间间隔了很大的一个 delay，执行也依然保持原样。
+
+`throttle` 的 options 参数还是非常有用的，可以改变函数的执行规律，很不错。这里面有一个小细节，每次函数执行完毕，都会判断 timeout 的值，并对 context 和 args 的清空。
+
+## 总结
+
+现在越来越觉得 Underscore 是一个非常有意思的扩展库， 每一个函数的背后，都有一个小故事。
+
 ## 参考
 
 >[关于js函数节流和去抖动](http://www.jianshu.com/p/4f3e2c8f5e95)
