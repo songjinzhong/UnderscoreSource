@@ -148,7 +148,33 @@ _.debounce = function(func, wait, immediate) {
 };
 ```
 
-去抖函数一个函数两个用途。
+去抖函数一个函数两个用途，也还真是方便。
+
+参考 `_` 中的实现方法，我们对之前的 debounce 函数进行改进：
+
+```javascript
+function debounce(fn, delay){
+  var timer, timestamp, self = this, args;
+
+  var later = function(){
+    var last = Date.now() - timestamp;
+    if(last < delay && last >=0){
+      timer = setTimeout(later, delay - last);
+    }else{
+      timer = null;
+      fn.apply(self, args);
+    }
+  }
+
+  return function(){
+    timestamp = Date.now();
+    if(!timer){
+      args = arguments;
+      timer = setTimeout(later, delay);
+    }
+  }
+}
+```
 
 ### 节流函数源码
 
@@ -200,6 +226,38 @@ _.throttle = function(func, wait, options) {
 `options` 参数如果同时设置 leading 和 trailing，就会出现一个小 bug，[#2589](https://github.com/jashkenas/underscore/issues/2589)，因为最后一次函数得不到执行，导致 `previous` 不会为 0，除了第一轮以外的所有其他轮在执行时，`leading` 参数是失效的。当然，官方给的解释是：不要将两个参数同时设置，但是如果仔细想想，这种需求也是存在的：从第一次点击时开始计时，使得函数的频率固定在 wait 时间内。如果中间间隔了很大的一个 delay，执行也依然保持原样。
 
 `throttle` 的 options 参数还是非常有用的，可以改变函数的执行规律，很不错。这里面有一个小细节，每次函数执行完毕，都会判断 timeout 的值，并对 context 和 args 的清空。
+
+仍然对我之前写的代码进行改进，无 `options` 参数的情况，即允许首次执行和尾执行：
+
+```javascript
+function throttle(fn, freq){
+  var self = this, start = Date.now(), timer, args;
+
+  var later = function(){
+    start = Date.now();
+    timer = null;
+    fn.apply(self, args);
+  }
+
+  return function(){
+    args = arguments;
+    var now = Date.now();
+    var remaining = freq - (now - start);
+    if(remaining <= 0 || remaining > freq){
+      if(timer){
+        clearTimeout(timer);
+        timer = null;
+      }
+      start = now;
+      fn.apply(self, args);
+    }else if(!timer){
+      timer = setTimeout(later, remaining);
+    }
+  }
+}
+```
+
+通过查看 `_.throttle` 的源码，发现节流并不是延迟，而是设定执行频率，我上面的改动就是按照这个思路来改的，参数由原来的三个变成现在的两个，而且改进后的函数，执行起来，频率还是相当固定的。
 
 ## 总结
 
